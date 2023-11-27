@@ -9,6 +9,7 @@ import pydub
 from pathlib import Path
 from datetime import datetime
 import openai
+import re
 
 import telegram
 from telegram import (
@@ -46,8 +47,6 @@ HELP_MESSAGE = """Commands:
 ⚪ /retry – Regenerate last bot answer
 ⚪ /new – Start new dialog
 ⚪ /mode – Select chat mode
-⚪ /settings – Show settings
-⚪ /balance – Show balance
 ⚪ /help – Show help
 
 🎨 Generate images from text prompts in <b>👩‍🎨 Artist</b> /mode
@@ -120,6 +119,9 @@ async def is_bot_mentioned(update: Update, context: CallbackContext):
              return True
 
          if message.text is not None and ("@" + context.bot.username) in message.text:
+             return True
+
+         if message.text is not None and message.text.lower().startswith("/ask"):
              return True
 
          if message.reply_to_message is not None:
@@ -196,6 +198,8 @@ async def message_handle(update: Update, context: CallbackContext, message=None,
     # remove bot mention (in group chats)
     if update.message.chat.type != "private":
         _message = _message.replace("@" + context.bot.username, "").strip()
+        compiled = re.compile(r"^/ask", re.IGNORECASE)
+        _message = compiled.sub("", _message).strip()
 
     await register_user_if_not_exists(update, context, update.message.from_user)
     if await is_previous_message_not_answered_yet(update, context): return
@@ -212,7 +216,7 @@ async def message_handle(update: Update, context: CallbackContext, message=None,
         if use_new_dialog_timeout:
             if (datetime.now() - db.get_user_attribute(user_id, "last_interaction")).seconds > config.new_dialog_timeout and len(db.get_dialog_messages(user_id)) > 0:
                 db.start_new_dialog(user_id)
-                await update.message.reply_text(f"Starting new dialog due to timeout (<b>{config.chat_modes[chat_mode]['name']}</b> mode) ✅", parse_mode=ParseMode.HTML)
+                # await update.message.reply_text(f"Starting new dialog due to timeout (<b>{config.chat_modes[chat_mode]['name']}</b> mode) ✅", parse_mode=ParseMode.HTML)
         db.set_user_attribute(user_id, "last_interaction", datetime.now())
 
         # in case of CancelledError
@@ -291,7 +295,7 @@ async def message_handle(update: Update, context: CallbackContext, message=None,
         except Exception as e:
             error_text = f"Something went wrong during completion. Reason: {e}"
             logger.error(error_text)
-            await update.message.reply_text(error_text)
+            # await update.message.reply_text(error_text)
             return
 
         # send message if some messages were removed from the context
@@ -651,11 +655,10 @@ async def error_handle(update: Update, context: CallbackContext) -> None:
 
 async def post_init(application: Application):
     await application.bot.set_my_commands([
+        BotCommand("/ask", "Ask a question"),
         BotCommand("/new", "Start new dialog"),
         BotCommand("/mode", "Select chat mode"),
         BotCommand("/retry", "Re-generate response for previous query"),
-        BotCommand("/balance", "Show balance"),
-        BotCommand("/settings", "Show settings"),
         BotCommand("/help", "Show help message"),
     ])
 
@@ -679,6 +682,7 @@ def run_bot() -> None:
     application.add_handler(CommandHandler("start", start_handle, filters=user_filter))
     application.add_handler(CommandHandler("help", help_handle, filters=user_filter))
     application.add_handler(CommandHandler("help_group_chat", help_group_chat_handle, filters=user_filter))
+    application.add_handler(CommandHandler("ask", message_handle, filters=user_filter))
 
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & user_filter, message_handle))
     application.add_handler(CommandHandler("retry", retry_handle, filters=user_filter))
@@ -690,11 +694,6 @@ def run_bot() -> None:
     application.add_handler(CommandHandler("mode", show_chat_modes_handle, filters=user_filter))
     application.add_handler(CallbackQueryHandler(show_chat_modes_callback_handle, pattern="^show_chat_modes"))
     application.add_handler(CallbackQueryHandler(set_chat_mode_handle, pattern="^set_chat_mode"))
-
-    application.add_handler(CommandHandler("settings", settings_handle, filters=user_filter))
-    application.add_handler(CallbackQueryHandler(set_settings_handle, pattern="^set_settings"))
-
-    application.add_handler(CommandHandler("balance", show_balance_handle, filters=user_filter))
 
     application.add_error_handler(error_handle)
 

@@ -3,14 +3,16 @@ import config
 import tiktoken
 import openai
 openai.api_key = config.openai_api_key
+openai.api_base = "https://nusalm.uncool.ai/api/oai/v1"
+#openai.api_base = "http://localhost:65530/v1"
 
 
 OPENAI_COMPLETION_OPTIONS = {
-    "temperature": 0.7,
+    "temperature": 1.0,
     "max_tokens": 1000,
-    "top_p": 1,
-    "frequency_penalty": 0,
-    "presence_penalty": 0
+    "top_p": 0.1,
+    "frequency_penalty": 0.5,
+    "presence_penalty": 0.7
 }
 
 
@@ -80,6 +82,7 @@ class ChatGPT:
                     async for r_item in r_gen:
                         delta = r_item.choices[0].delta
                         if "content" in delta:
+                            # print(f"Stream: {delta.content}")
                             answer += delta.content
                             n_input_tokens, n_output_tokens = self._count_tokens_from_messages(messages, answer, model=self.model)
                             n_first_dialog_messages_removed = n_dialog_messages_before - len(dialog_messages)
