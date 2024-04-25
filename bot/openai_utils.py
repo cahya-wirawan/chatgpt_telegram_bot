@@ -10,7 +10,7 @@ openai.api_base = "https://nusalm.uncool.ai/api/oai/v1"
 OPENAI_COMPLETION_OPTIONS = {
     "temperature": 1.0,
     "max_tokens": 1000,
-    "top_p": 0.1,
+    "top_p": 0.5,
     "frequency_penalty": 0.5,
     "presence_penalty": 0.7
 }
